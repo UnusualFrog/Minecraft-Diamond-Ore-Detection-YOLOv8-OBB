@@ -9,6 +9,8 @@ from ultralytics import YOLO
 POSITIVE_IMG_DIR = Path("Data/prototype_132/images")
 POSITIVE_LBL_DIR = Path("Data/prototype_132/labels")
 DATASET_DIR  = Path("Data/dataset")
+RUNS_DIR = Path(__file__).parent / "runs" / "obb"
+PREDICT_DIR = Path(__file__).parent / "Data" / "predict"
 
 # Train/ Test split
 VAL_SPLIT    = 0.2
@@ -20,7 +22,6 @@ BATCH_SIZE       = 16
 IMG_SIZE         = 640
 PATIENCE         = 20
 DEVICE           = 0 if torch.cuda.is_available() else "cpu"
-RUNS_DIR         = Path("./Final Project/runs/obb")
 
 """ ========== Load Data ========== """
 def build_dataset():
@@ -98,8 +99,9 @@ def train(yaml_path):
 
 """ ========== Test Model ========== """
 def test(yaml_path):
+    # Load the weights of the best performing training epoch
     best_weights = RUNS_DIR / "diamond_ore" / "weights" / "best.pt"
-
+    # Re-create model from best weights
     model = YOLO(str(best_weights))
 
     metrics = model.val(
@@ -109,10 +111,14 @@ def test(yaml_path):
         plots   = True,
     )
 
+    # Print evaluation metrics
     print(f"\nPrecision : {metrics.box.mp:.4f}")
     print(f"Recall    : {metrics.box.mr:.4f}")
     print(f"mAP@50    : {metrics.box.map50:.4f}")
     print(f"mAP@50-95 : {metrics.box.map:.4f}")
+
+""" ========== Predict Un-seen Data =========="""
+def predict(path)
 
 
 def main():
