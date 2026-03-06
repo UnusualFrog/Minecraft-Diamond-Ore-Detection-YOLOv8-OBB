@@ -118,13 +118,31 @@ def test(yaml_path):
     print(f"mAP@50-95 : {metrics.box.map:.4f}")
 
 """ ========== Predict Un-seen Data =========="""
-def predict(path)
+def predict():
+    # Reconstruct model using best weights
+    best_weights = RUNS_DIR / "diamond_ore" / "weights" / "best.pt"
+    model = YOLO(str(best_weights))
+
+    results = model.predict(
+        source  = str(PREDICT_DIR),
+        task    = "obb",
+        device  = DEVICE,
+        conf    = 0.25,
+        save    = True,
+        project = str(RUNS_DIR),
+        name    = "predict",
+    )
+
+    for result in results:
+        boxes = result.obb
+        print(f"{result.path} — {len(boxes)} detection(s)")
 
 
 def main():
     dataset = build_dataset()
     train(dataset)
     test(dataset)
+    
 
 if __name__ == "__main__":
     main()
