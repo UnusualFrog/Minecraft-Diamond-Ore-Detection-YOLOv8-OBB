@@ -6,22 +6,29 @@ from pathlib import Path
 from ultralytics import YOLO
 
 """ ========== Config ========== """
+# Location of YOLO format images and labels
 POSITIVE_IMG_DIR = Path("Data/prototype_132/images")
 POSITIVE_LBL_DIR = Path("Data/prototype_132/labels")
+# Location to build YOLO dataset
 DATASET_DIR  = Path("Data/dataset")
+# Location of output
 RUNS_DIR = Path(__file__).parent / "runs" / "obb"
+# Location of unseen data for predictions
 PREDICT_DIR = Path(__file__).parent / "Data" / "predict"
 
-# Train/ Test split
+# Train/ Test split of 80/20
 VAL_SPLIT    = 0.2
+# Global Random Seed 42 for reproducability
 RANDOM_STATE = 42
 
+# Utilize pre-trained YOLOv8 w/ OBB model
 PRETRAINED_MODEL = "yolov8n-obb.pt"
+# Training parameters
 EPOCHS           = 100
 BATCH_SIZE       = 16
 IMG_SIZE         = 640
-PATIENCE         = 20
-DEVICE           = 0 if torch.cuda.is_available() else "cpu"
+PATIENCE         = 20                                        # Number of epochs to re-try with no change before early termination
+DEVICE           = 0 if torch.cuda.is_available() else "cpu" # Use GPU if available
 
 """ ========== Load Data ========== """
 def build_dataset():
@@ -38,12 +45,10 @@ def build_dataset():
     random.seed(RANDOM_STATE)
     random.shuffle(pos_pairs)
 
-    # Calculate split as whole number
+    # Calculate dynamic train/test split as whole number based on sample size
     n_val       = int(len(pos_pairs) * VAL_SPLIT)
     train_pairs = pos_pairs[n_val:]
     val_pairs   = pos_pairs[:n_val]
-
-    # print(f"Train : {len(train_pairs)}  |  Val : {len(val_pairs)}")
 
     """ ========== Build Local YOLO-format Dataset ========== """
     # Generate output directories for train and val datasets
@@ -84,14 +89,14 @@ def train(yaml_path):
 
     model.train(
         data     = str(yaml_path),
-        task     = "obb",
+        task     = "obb",           # Use oriented bounding boxes (not straight)
         epochs   = EPOCHS,
         batch    = BATCH_SIZE,
         imgsz    = IMG_SIZE,
         patience = PATIENCE,
         device   = DEVICE,
-        plots    = True,
-        project  = str(RUNS_DIR),
+        plots    = True,            # Generate images with bounding boxes plotting predictions
+        project  = str(RUNS_DIR),   
         name     = "diamond_ore",
     )
 
@@ -129,18 +134,20 @@ def predict():
         source  = str(PREDICT_DIR),
         task    = "obb",
         device  = DEVICE,
-        conf    = 0.25,
-        save    = True,
+        conf    = 0.25,             # Predictions below conf threshold will not be counted
+        save    = True,             
         project = str(RUNS_DIR),
         name    = "predict",
     )
 
+    # Print number of occurances of target in each sample
     for result in results:
         boxes = result.obb
         print(f"{result.path} — {len(boxes)} detection(s)")
 
 
 def main():
+    # Construct YOLO dataset
     dataset = build_dataset()
     
     while True:
