@@ -109,6 +109,8 @@ def test(yaml_path):
         task    = "obb",
         device  = DEVICE,
         plots   = True,
+        project = str(RUNS_DIR),
+        name = "validate"
     )
 
     # Print evaluation metrics
@@ -140,8 +142,23 @@ def predict():
 
 def main():
     dataset = build_dataset()
-    train(dataset)
-    test(dataset)
+    
+    while True:
+        print("Select an option")
+        print("0. Exit")
+        print("1. Train Model")
+        print("2. Test Model")
+        print("3. Predict Unseen Data")
+        res = input()
+
+        if res == "0":
+            break
+        elif res == "1":
+            train(dataset)
+        elif res == "2":
+            test(dataset)
+        else:
+            predict()
     
 
 if __name__ == "__main__":
