@@ -2,7 +2,9 @@ venv/
 prototype_132/
 train/
 Data/dataset/*
+!Data/dataset/.gitkeep
 Data/predict/*
+!Data/predict/.gitkeep
 yolo26n.pt
 yolov8n-obb.pt
 runs/
