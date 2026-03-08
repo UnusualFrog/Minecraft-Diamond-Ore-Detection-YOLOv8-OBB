@@ -1,0 +1,8 @@
+venv/
+prototype_132/
+train/
+Data/dataset/*
+Data/predict/*
+yolo26n.pt
+yolov8n-obb.pt
+runs/
