@@ -7,31 +7,38 @@ from ultralytics import YOLO
 
 """ ========== Config ========== """
 # Location of YOLO format images and labels
-POSITIVE_IMG_DIR = Path("Data/prototype_132/images")
-POSITIVE_LBL_DIR = Path("Data/prototype_132/labels")
+POSITIVE_IMG_DIR = Path("Data/final_dataset_600/images")
+POSITIVE_LBL_DIR = Path("Data/final_dataset_600/labels")
 # Location to build YOLO dataset
 DATASET_DIR  = Path("Data/dataset")
 # Location of output
 RUNS_DIR = Path(__file__).parent / "runs" / "obb"
 # Location of unseen data for predictions
 PREDICT_DIR = Path(__file__).parent / "Data" / "predict"
+# Utilize pre-trained YOLOv8 w/ OBB model
+PRETRAINED_MODEL = "yolov8s-obb.pt"
 
-# Train/ Test split of 80/20
-VAL_SPLIT    = 0.2
 # Global Random Seed 42 for reproducability
 RANDOM_STATE = 42
+# Train/ Test split of 80/20
+VAL_SPLIT = 0.2
+# Use GPU if available, otherwise use CPU
+DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"  
 
-# Utilize pre-trained YOLOv8 w/ OBB model
-PRETRAINED_MODEL = "yolov8n-obb.pt"
 # Training parameters
-EPOCHS           = 100
-BATCH_SIZE       = 16
-IMG_SIZE         = 640
-PATIENCE         = 20                                        # Number of epochs to re-try with no change before early termination
-DEVICE           = 0 if torch.cuda.is_available() else "cpu" # Use GPU if available
+EPOCHS = 100
+BATCH_SIZE = 16
+IMG_SIZE = 640
+PATIENCE = 20 # Number of epochs to re-try with no change before early termination
+
 
 """ ========== Load Data ========== """
 def build_dataset():
+    # Use existing dataset if exists
+    if (DATASET_DIR / "dataset.yaml").exists():
+        print(f"Using existing dataset at {DATASET_DIR}")
+        return DATASET_DIR / "dataset.yaml"
+
     # Load images
     pos_image_paths = sorted(POSITIVE_IMG_DIR.glob("*.png"))
 
@@ -39,7 +46,12 @@ def build_dataset():
     pos_pairs = []
     for img_path in pos_image_paths:
         lbl_path = POSITIVE_LBL_DIR / (img_path.stem + ".txt")
-        pos_pairs.append((img_path, lbl_path))
+
+        # Ensure label path exists
+        if lbl_path.exists():
+            pos_pairs.append((img_path, lbl_path))
+        else:
+            print(f"Warning: missing label for {img_path.name}, skipping.")
 
     # Train Test Split
     random.seed(RANDOM_STATE)
@@ -82,40 +94,50 @@ def build_dataset():
     
     return yaml_path
 
+# Get best performing model weights
+def get_best_weights(run_dir):
+    weights = run_dir / "weights" / "best.pt"
+
+    # Check if best.pt exists
+    if not weights.exists():
+        raise FileNotFoundError(f"No best.pt found at {weights}. Did training complete?")
+    
+    return weights
+
 """ =========== Train Model ==========="""
 def train(yaml_path):
     # Load pre-trained 
     model = YOLO(PRETRAINED_MODEL)
 
     model.train(
-        data     = str(yaml_path),
-        task     = "obb",           # Use oriented bounding boxes (not straight)
-        epochs   = EPOCHS,
-        batch    = BATCH_SIZE,
-        imgsz    = IMG_SIZE,
+        data = str(yaml_path),
+        task = "obb",           # Use oriented bounding boxes (not straight)
+        epochs = EPOCHS,
+        batch = BATCH_SIZE,
+        imgsz = IMG_SIZE,
         patience = PATIENCE,
-        device   = DEVICE,
-        plots    = True,            # Generate images with bounding boxes plotting predictions
-        project  = str(RUNS_DIR),   
-        name     = "diamond_ore",
+        device = DEVICE,
+        plots = True,            # Generate images with bounding boxes plotting predictions
+        project = str(RUNS_DIR),   
+        name = "diamond_ore"
     )
 
-    return model
+    run_dir = Path(model.trainer.save_dir)
+    return run_dir
 
 """ ========== Test Model ========== """
-def test(yaml_path):
-    # Load the weights of the best performing training epoch
-    best_weights = RUNS_DIR / "diamond_ore" / "weights" / "best.pt"
-    # Re-create model from best weights
-    model = YOLO(str(best_weights))
+def test(yaml_path, run_dir):
+    # Load the weights of the model for the best performing training epoch
+    model = YOLO(str(get_best_weights(run_dir)))
 
     metrics = model.val(
-        data    = str(yaml_path),
-        task    = "obb",
-        device  = DEVICE,
-        plots   = True,
+        data = str(yaml_path),
+        task = "obb",
+        device = DEVICE,
+        plots = True,
         project = str(RUNS_DIR),
-        name = "validate"
+        name = "validate",
+        exist_ok= True
     )
 
     # Print evaluation metrics
@@ -125,30 +147,44 @@ def test(yaml_path):
     print(f"mAP@50-95 : {metrics.box.map:.4f}")
 
 """ ========== Predict Un-seen Data =========="""
-def predict():
+def predict(run_dir):
     # Reconstruct model using best weights
-    best_weights = RUNS_DIR / "diamond_ore" / "weights" / "best.pt"
-    model = YOLO(str(best_weights))
+    model = YOLO(str(get_best_weights(run_dir)))
 
     results = model.predict(
-        source  = str(PREDICT_DIR),
-        task    = "obb",
-        device  = DEVICE,
-        conf    = 0.25,             # Predictions below conf threshold will not be counted
-        save    = True,             
+        source = str(PREDICT_DIR),
+        task = "obb",
+        device = DEVICE,
+        conf = 0.25,             # Predictions below conf threshold will not be counted
+        save = True,             
         project = str(RUNS_DIR),
-        name    = "predict",
+        name = "predict",
     )
 
     # Print number of occurances of target in each sample
     for result in results:
         boxes = result.obb
-        print(f"{result.path} — {len(boxes)} detection(s)")
+        n = len(boxes)
+        filename = Path(result.path).name
 
+        # No occurences
+        if n == 0:
+            print(f"{filename} — no detections")
+            continue
+        
+        # Get model confidence score
+        confs = boxes.conf.cpu().numpy()
+        print(f"{filename} — {n} detection(s) | "
+              f"Avg. Confidence: {confs.mean():.2f}")
 
 def main():
+    print(f"Using device: {DEVICE}")
+    if DEVICE != "cpu":
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+
     # Construct YOLO dataset
     dataset = build_dataset()
+    run_dir = None
     
     while True:
         print("Select an option")
@@ -161,11 +197,19 @@ def main():
         if res == "0":
             break
         elif res == "1":
-            train(dataset)
+            run_dir = train(dataset)
         elif res == "2":
-            test(dataset)
+            if run_dir is None:
+                # Fall back to most recent existing run
+                run_dir = RUNS_DIR / "diamond_ore"
+            test(dataset, run_dir)
+        elif res == "3":
+            if run_dir is None:
+                # Fall back to most recent existing run 
+                run_dir = RUNS_DIR / "diamond_ore"
+            predict(run_dir)
         else:
-            predict()
+            print("Error: Invalid Input")
     
 
 if __name__ == "__main__":
