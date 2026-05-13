@@ -10,23 +10,22 @@ This project trains the YOLOv8 computer vision model on annotated screenshots of
 - Pre-trained model included with repository for immediate use with unseen data
 - Unseen screenshots can easily be fed to the model by placing images in the correct `predict` directory
 
+## Example Outputs
+![Output Screenshot](Screenshots/screenshot1.png)
+
+![Output Screenshot](Screenshots/screenshot2.png)
+
 
 ## Dataset
 - Model was trained using data from the [MiDaS Dataset](https://github.com/MinecraftDataset/MiDaS/tree/main)
 - Samples were manually labelled using Label Studio with Object Oriented Bounding Boxes
-## Tech Stack
 
+## Tech Stack
 - Python 3.12.3
 - Ultralytics 8.4.21
 - Torch 2.1.0
 - Torchvision 0.25.0
 
-
-## Example Outputs
-
-![Output Screenshot](Screenshots/screenshot1.png)
-
-![Output Screenshot](Screenshots/screenshot2.png)
 
 ## Project Setup
 
