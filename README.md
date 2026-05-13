@@ -22,7 +22,12 @@ This project trains the YOLOv8 computer vision model on annotated screenshots of
 - Torchvision 0.25.0
 
 
-## Screenshots
+## Example Outputs
+
+![Output Screenshot](Screenshots/screenshot1.png)
+
+![Output Screenshot](Screenshots/screenshot2.png)
+
 ## Project Setup
 
 ### Step 1 - Download dependencies
